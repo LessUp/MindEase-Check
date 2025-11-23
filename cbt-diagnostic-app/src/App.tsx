@@ -174,17 +174,24 @@ export default function App() {
       hour: '2-digit', minute: '2-digit',
     }).format(ts)
 
-  const handleRestart = () => {
-    setPhq9(Array(PHQ9_ITEMS.length).fill(-1))
-    setGad7(Array(GAD7_ITEMS.length).fill(-1))
-    paginate('intro', -1)
-  }
-
   const restoreFromLastSaved = () => {
     if (!lastSaved) return
     setPhq9([...lastSaved.phq9])
     setGad7([...lastSaved.gad7])
     paginate('result', 1)
+  }
+
+  const clearLocalSnapshot = () => {
+    try {
+      localStorage.removeItem('cbt-diagnostic-latest')
+    } catch {}
+    setLastSaved(null)
+  }
+
+  const handleRestart = () => {
+    setPhq9(Array(PHQ9_ITEMS.length).fill(-1))
+    setGad7(Array(GAD7_ITEMS.length).fill(-1))
+    paginate('intro', -1)
   }
 
   // Animation variants for page transitions
