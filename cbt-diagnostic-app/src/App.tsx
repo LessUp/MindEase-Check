@@ -3,11 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 import Questionnaire from './components/Questionnaire'
-import { Layout } from './components/layout/Layout'
+import { AppShell } from './components/layout/AppShell'
 import { Intro } from './components/views/Intro'
 import { Result } from './components/views/Result'
 import { ProgressBar } from './components/ui/ProgressBar'
 import { Button } from './components/ui/Button'
+import { useAppStore } from './stores/useAppStore'
+import type { AssessmentRecord, ScaleType } from './core/types'
 
 import { PHQ9_ITEMS, GAD7_ITEMS } from './data/scales'
 import {
@@ -38,11 +40,15 @@ type AssessmentSnapshot = {
 export default function App() {
   const [step, setStep] = useState<Step>('intro')
   const [direction, setDirection] = useState(0)
-  const [phq9, setPhq9] = useState<number[]>(Array(PHQ9_ITEMS.length).fill(-1))
-  const [gad7, setGad7] = useState<number[]>(Array(GAD7_ITEMS.length).fill(-1))
+  const [phq9Answers, setPhq9Answers] = useState<number[]>(Array(PHQ9_ITEMS.length).fill(-1))
+  const [gad7Answers, setGad7Answers] = useState<number[]>(Array(GAD7_ITEMS.length).fill(-1))
 
   const [allowLocalSave, setAllowLocalSave] = useState<boolean>(false)
   const [lastSaved, setLastSaved] = useState<AssessmentSnapshot | null>(null)
+
+  // 使用全局状态管理
+  const addAssessment = useAppStore((s) => s.addAssessment)
+  const activeTab = useAppStore((s) => s.activeTab)
 
   // Scroll to top on step change
   useEffect(() => {
@@ -55,11 +61,11 @@ export default function App() {
   }
 
   // Derived
-  const phqTotal = useMemo(() => phq9Total(phq9.map(v => (v < 0 ? 0 : v))), [phq9])
-  const gadTotal = useMemo(() => gad7Total(gad7.map(v => (v < 0 ? 0 : v))), [gad7])
+  const phqTotal = useMemo(() => phq9Total(phq9Answers.map(v => (v < 0 ? 0 : v))), [phq9Answers])
+  const gadTotal = useMemo(() => gad7Total(gad7Answers.map(v => (v < 0 ? 0 : v))), [gad7Answers])
   const phqLevel: Phq9Severity = useMemo(() => phq9Severity(phqTotal), [phqTotal])
   const gadLevel: Gad7Severity = useMemo(() => gad7Severity(gadTotal), [gadTotal])
-  const triageRes = useMemo(() => triage(phq9, gad7), [phq9, gad7])
+  const triageRes = useMemo(() => triage(phq9Answers, gad7Answers), [phq9Answers, gad7Answers])
   const tips = useMemo(() => generateCbtTips(phqLevel, gadLevel), [phqLevel, gadLevel])
   const phqInfo = useMemo(() => PHQ9_SEVERITY_INFO[phqLevel], [phqLevel])
   const gadInfo = useMemo(() => GAD7_SEVERITY_INFO[gadLevel], [gadLevel])
@@ -98,6 +104,33 @@ export default function App() {
     )
   }
 
+  // 保存评估记录到全局Store
+  const saveToStore = () => {
+    // PHQ-9 记录
+    const phq9Record: AssessmentRecord = {
+      id: `phq9_${Date.now()}`,
+      scaleId: 'PHQ9',
+      answers: phq9Answers,
+      totalScore: phqTotal,
+      severity: phqInfo.label,
+      completedAt: Date.now(),
+      synced: false,
+    }
+    addAssessment(phq9Record)
+
+    // GAD-7 记录
+    const gad7Record: AssessmentRecord = {
+      id: `gad7_${Date.now()}`,
+      scaleId: 'GAD7',
+      answers: gad7Answers,
+      totalScore: gadTotal,
+      severity: gadInfo.label,
+      completedAt: Date.now(),
+      synced: false,
+    }
+    addAssessment(gad7Record)
+  }
+
   const loadLatestSnapshot = () => {
     try {
       const raw = localStorage.getItem('cbt-diagnostic-latest')
@@ -133,8 +166,8 @@ export default function App() {
     try {
       const payload = {
         ts: Date.now(),
-        phq9,
-        gad7,
+        phq9: phq9Answers,
+        gad7: gad7Answers,
         phqTotal,
         gadTotal,
         phqLevel,
@@ -142,8 +175,11 @@ export default function App() {
       }
       localStorage.setItem('cbt-diagnostic-latest', JSON.stringify(payload))
       setLastSaved(payload)
+      
+      // 同时保存到全局Store
+      saveToStore()
     } catch {}
-  }, [step, allowLocalSave, phq9, gad7, phqTotal, gadTotal, phqLevel, gadLevel])
+  }, [step, allowLocalSave, phq9Answers, gad7Answers, phqTotal, gadTotal, phqLevel, gadLevel])
 
   const allAnswered = (arr: number[]) => arr.every(v => v >= 0)
   const answeredCount = (arr: number[]) => arr.filter(v => v >= 0).length
@@ -176,8 +212,8 @@ export default function App() {
 
   const restoreFromLastSaved = () => {
     if (!lastSaved) return
-    setPhq9([...lastSaved.phq9])
-    setGad7([...lastSaved.gad7])
+    setPhq9Answers([...lastSaved.phq9])
+    setGad7Answers([...lastSaved.gad7])
     paginate('result', 1)
   }
 
@@ -189,8 +225,8 @@ export default function App() {
   }
 
   const handleRestart = () => {
-    setPhq9(Array(PHQ9_ITEMS.length).fill(-1))
-    setGad7(Array(GAD7_ITEMS.length).fill(-1))
+    setPhq9Answers(Array(PHQ9_ITEMS.length).fill(-1))
+    setGad7Answers(Array(GAD7_ITEMS.length).fill(-1))
     paginate('intro', -1)
   }
 
@@ -212,8 +248,11 @@ export default function App() {
     })
   }
 
+  // 根据当前tab决定是否显示导航
+  const showNav = activeTab !== 'home' || step === 'intro'
+
   return (
-    <Layout>
+    <AppShell showNav={showNav}>
       <AnimatePresence mode="wait" custom={direction}>
         {step === 'intro' && (
           <motion.div
@@ -256,14 +295,14 @@ export default function App() {
               opacity: { duration: 0.2 }
             }}
           >
-            <ProgressBar current={answeredCount(phq9)} total={PHQ9_ITEMS.length} />
+            <ProgressBar current={answeredCount(phq9Answers)} total={PHQ9_ITEMS.length} />
             <Questionnaire
               title="第一部分：PHQ-9"
               subtitle="请根据过去两周内的实际感受，回答以下问题。"
               items={PHQ9_ITEMS}
-              responses={phq9}
+              responses={phq9Answers}
               onChange={(index, value) =>
-                setPhq9(prev => prev.map((v, i) => (i === index ? value : v)))
+                setPhq9Answers(prev => prev.map((v, i) => (i === index ? value : v)))
               }
             />
             <div className="flex items-center justify-between pt-4">
@@ -273,7 +312,7 @@ export default function App() {
               </Button>
               <Button 
                 onClick={() => paginate('gad7', 1)} 
-                disabled={!allAnswered(phq9)}
+                disabled={!allAnswered(phq9Answers)}
                 className="w-32"
               >
                 下一步
@@ -297,14 +336,14 @@ export default function App() {
               opacity: { duration: 0.2 }
             }}
           >
-            <ProgressBar current={answeredCount(gad7)} total={GAD7_ITEMS.length} />
+            <ProgressBar current={answeredCount(gad7Answers)} total={GAD7_ITEMS.length} />
             <Questionnaire
               title="第二部分：GAD-7"
               subtitle="请根据过去两周内的实际感受，回答以下问题。"
               items={GAD7_ITEMS}
-              responses={gad7}
+              responses={gad7Answers}
               onChange={(index, value) =>
-                setGad7(prev => prev.map((v, i) => (i === index ? value : v)))
+                setGad7Answers(prev => prev.map((v, i) => (i === index ? value : v)))
               }
             />
             <div className="flex items-center justify-between pt-4">
@@ -314,7 +353,7 @@ export default function App() {
               </Button>
               <Button 
                 onClick={() => paginate('result', 1)} 
-                disabled={!allAnswered(gad7)}
+                disabled={!allAnswered(gad7Answers)}
                 className="w-32"
               >
                 查看结果
@@ -356,6 +395,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </Layout>
+    </AppShell>
   )
 }
