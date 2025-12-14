@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // Try to infer base path for GitHub Pages automatically.
@@ -10,4 +10,8 @@ const base = process.env.VITE_BASE || process.env.GH_PAGES_BASE || inferredBase
 export default defineConfig({
   base,
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  },
 })
