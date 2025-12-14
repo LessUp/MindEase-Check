@@ -18,13 +18,15 @@ const BoxBreathing = () => {
       timer = setTimeout(() => setCountdown(c => c - 1), 1000);
     } else {
       // Cycle transitions
-      setCountdown(4);
-      switch (status) {
-        case 'inhale': setStatus('hold-in'); break;
-        case 'hold-in': setStatus('exhale'); break;
-        case 'exhale': setStatus('hold-out'); break;
-        case 'hold-out': setStatus('inhale'); break;
-      }
+      timer = setTimeout(() => {
+        setCountdown(4);
+        switch (status) {
+          case 'inhale': setStatus('hold-in'); break;
+          case 'hold-in': setStatus('exhale'); break;
+          case 'exhale': setStatus('hold-out'); break;
+          case 'hold-out': setStatus('inhale'); break;
+        }
+      }, 0);
     }
     return () => clearTimeout(timer);
   }, [status, countdown]);
@@ -99,7 +101,7 @@ const BoxBreathing = () => {
 const MeditationGuide = () => {
   const [isActive, setIsActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes
-  const [phase, setPhase] = useState(0);
+  const phase = timeLeft > 120 ? 0 : timeLeft > 60 ? 1 : 2;
 
   useEffect(() => {
     if (!isActive) return;
@@ -117,17 +119,6 @@ const MeditationGuide = () => {
     return () => clearInterval(interval);
   }, [isActive]);
 
-  useEffect(() => {
-    // Determine phase based on time left (Total 180s)
-    // 180-120: Phase 0 (Prepare & Breath)
-    // 120-60: Phase 1 (Body Scan)
-    // 60-0: Phase 2 (Mindfulness)
-    if (timeLeft > 120) setPhase(0);
-    else if (timeLeft > 60) setPhase(1);
-    else if (timeLeft > 0) setPhase(2);
-    else setPhase(3); // Finished
-  }, [timeLeft]);
-
   const toggleTimer = () => {
     if (isActive) {
       setIsActive(false);
@@ -140,7 +131,6 @@ const MeditationGuide = () => {
   const reset = () => {
     setIsActive(false);
     setTimeLeft(180);
-    setPhase(0);
   };
 
   const formatTime = (seconds: number) => {

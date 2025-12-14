@@ -35,14 +35,50 @@ type AssessmentSnapshot = {
   gadLevel: Gad7Severity
 }
 
+const readAllowLocalSavePreference = () => {
+  try {
+    return localStorage.getItem('cbt-diagnostic-allow-save') === 'true'
+  } catch {
+    return false
+  }
+}
+
+const validateSnapshot = (raw: unknown): raw is AssessmentSnapshot => {
+  if (typeof raw !== 'object' || raw === null) return false
+  const snapshot = raw as Partial<AssessmentSnapshot>
+  const isValidResponses = (arr: unknown, length: number) =>
+    Array.isArray(arr) && arr.length === length && arr.every(v => typeof v === 'number')
+  return (
+    typeof snapshot.ts === 'number' &&
+    isValidResponses(snapshot.phq9, PHQ9_ITEMS.length) &&
+    isValidResponses(snapshot.gad7, GAD7_ITEMS.length) &&
+    typeof snapshot.phqTotal === 'number' &&
+    typeof snapshot.gadTotal === 'number' &&
+    typeof snapshot.phqLevel === 'string' &&
+    typeof snapshot.gadLevel === 'string'
+  )
+}
+
+const readLatestSnapshot = (): AssessmentSnapshot | null => {
+  try {
+    const raw = localStorage.getItem('cbt-diagnostic-latest')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!validateSnapshot(parsed)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 export default function App() {
   const [step, setStep] = useState<Step>('intro')
   const [direction, setDirection] = useState(0)
   const [phq9, setPhq9] = useState<number[]>(Array(PHQ9_ITEMS.length).fill(-1))
   const [gad7, setGad7] = useState<number[]>(Array(GAD7_ITEMS.length).fill(-1))
 
-  const [allowLocalSave, setAllowLocalSave] = useState<boolean>(false)
-  const [lastSaved, setLastSaved] = useState<AssessmentSnapshot | null>(null)
+  const [allowLocalSave, setAllowLocalSave] = useState<boolean>(readAllowLocalSavePreference)
+  const [lastSaved, setLastSaved] = useState<AssessmentSnapshot | null>(readLatestSnapshot)
 
   // Scroll to top on step change
   useEffect(() => {
@@ -64,6 +100,30 @@ export default function App() {
   const phqInfo = useMemo(() => PHQ9_SEVERITY_INFO[phqLevel], [phqLevel])
   const gadInfo = useMemo(() => GAD7_SEVERITY_INFO[gadLevel], [gadLevel])
   
+  const saveSnapshot = () => {
+    const payload: AssessmentSnapshot = {
+      ts: Date.now(),
+      phq9: [...phq9],
+      gad7: [...gad7],
+      phqTotal,
+      gadTotal,
+      phqLevel,
+      gadLevel,
+    }
+    try {
+      localStorage.setItem('cbt-diagnostic-latest', JSON.stringify(payload))
+    } catch {}
+    setLastSaved(payload)
+  }
+
+  const setAllowLocalSaveWithSnapshot: React.Dispatch<React.SetStateAction<boolean>> = value => {
+    const next = typeof value === 'function' ? value(allowLocalSave) : value
+    setAllowLocalSave(next)
+    if (next && step === 'result') {
+      saveSnapshot()
+    }
+  }
+
   const crisisSupportTips = useMemo(() => {
     if (triageRes.level === 'crisis') {
       return [
@@ -83,67 +143,10 @@ export default function App() {
   }, [triageRes])
 
   useEffect(() => {
-    const validateSnapshot = (raw: unknown): raw is AssessmentSnapshot => {
-      if (typeof raw !== 'object' || raw === null) return false
-      const snapshot = raw as Partial<AssessmentSnapshot>
-      const isValidResponses = (arr: unknown, length: number) =>
-        Array.isArray(arr) && arr.length === length && arr.every(v => typeof v === 'number')
-      return (
-        typeof snapshot.ts === 'number' &&
-        isValidResponses(snapshot.phq9, PHQ9_ITEMS.length) &&
-        isValidResponses(snapshot.gad7, GAD7_ITEMS.length) &&
-        typeof snapshot.phqTotal === 'number' &&
-        typeof snapshot.gadTotal === 'number' &&
-        typeof snapshot.phqLevel === 'string' &&
-        typeof snapshot.gadLevel === 'string'
-      )
-    }
-
-    const loadLatestSnapshot = () => {
-      try {
-        const raw = localStorage.getItem('cbt-diagnostic-latest')
-        if (!raw) return
-        const parsed = JSON.parse(raw)
-        if (validateSnapshot(parsed)) {
-          setLastSaved(parsed)
-        }
-      } catch {}
-    }
-
-    try {
-      const pref = localStorage.getItem('cbt-diagnostic-allow-save')
-      if (pref === 'true') {
-        setAllowLocalSave(true)
-      }
-    } catch {}
-    loadLatestSnapshot()
-  }, [])
-
-  useEffect(() => {
     try {
       localStorage.setItem('cbt-diagnostic-allow-save', allowLocalSave ? 'true' : 'false')
     } catch {}
   }, [allowLocalSave])
-
-  useEffect(() => {
-    if (!allowLocalSave) return
-    // Don't save if we are not in result step or if data is incomplete
-    if (step !== 'result') return
-
-    try {
-      const payload = {
-        ts: Date.now(),
-        phq9,
-        gad7,
-        phqTotal,
-        gadTotal,
-        phqLevel,
-        gadLevel,
-      }
-      localStorage.setItem('cbt-diagnostic-latest', JSON.stringify(payload))
-      setLastSaved(payload)
-    } catch {}
-  }, [step, allowLocalSave, phq9, gad7, phqTotal, gadTotal, phqLevel, gadLevel])
 
   const allAnswered = (arr: number[]) => arr.every(v => v >= 0)
   const answeredCount = (arr: number[]) => arr.filter(v => v >= 0).length
@@ -231,7 +234,7 @@ export default function App() {
             <Intro
               onStart={() => paginate('phq9', 1)}
               allowLocalSave={allowLocalSave}
-              setAllowLocalSave={setAllowLocalSave}
+              setAllowLocalSave={setAllowLocalSaveWithSnapshot}
               lastSaved={lastSaved}
               onRestore={restoreFromLastSaved}
               onClearHistory={clearLocalSnapshot}
@@ -313,7 +316,10 @@ export default function App() {
                 上一步
               </Button>
               <Button 
-                onClick={() => paginate('result', 1)} 
+                onClick={() => {
+                  if (allowLocalSave) saveSnapshot()
+                  paginate('result', 1)
+                }} 
                 disabled={!allAnswered(gad7)}
                 className="w-32"
               >
@@ -348,7 +354,7 @@ export default function App() {
               crisisSupportTips={crisisSupportTips}
               tips={tips}
               allowLocalSave={allowLocalSave}
-              setAllowLocalSave={setAllowLocalSave}
+              setAllowLocalSave={setAllowLocalSaveWithSnapshot}
               onRestart={handleRestart}
               onBack={() => paginate('gad7', -1)}
               badgeClass={badgeClass}
