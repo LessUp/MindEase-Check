@@ -37,7 +37,6 @@ describe('scoring', () => {
 
   it('triage high when total >= threshold', () => {
     const phq9 = Array(9).fill(3)
-    // Avoid crisis by ensuring PHQ-9 item 9 < 2, while keeping total >= 20
     phq9[8] = 0
     const gad7 = Array(7).fill(0)
 
