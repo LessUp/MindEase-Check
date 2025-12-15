@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { COMMON_OPTIONS } from '../data/scales';
+import { COMMON_OPTIONS } from '../domain/assessment/scales';
 import { Card } from './ui/Card';
 import { cn } from '../lib/utils';
 

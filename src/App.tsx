@@ -9,7 +9,7 @@ import { Result } from './components/views/Result'
 import { ProgressBar } from './components/ui/ProgressBar'
 import { Button } from './components/ui/Button'
 
-import { PHQ9_ITEMS, GAD7_ITEMS } from './data/scales'
+import { PHQ9_ITEMS, GAD7_ITEMS } from './domain/assessment/scales'
 import {
   phq9Total,
   gad7Total,
@@ -20,8 +20,8 @@ import {
   triage,
   PHQ9_SEVERITY_INFO,
   GAD7_SEVERITY_INFO,
-} from './utils/scoring'
-import { generateCbtTips } from './utils/cbt'
+} from './domain/assessment/scoring'
+import { generateCbtTips } from './domain/assessment/cbt'
 
 type Step = 'intro' | 'phq9' | 'gad7' | 'result'
 

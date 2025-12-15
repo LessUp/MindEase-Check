@@ -5,7 +5,9 @@ import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { ShareResult } from '../features/ShareResult';
 import { CbtTools } from '../features/CbtTools';
-import { type Phq9Severity, type Gad7Severity } from '../../utils/scoring';
+import { type Phq9Severity, type Gad7Severity } from '../../domain/assessment/scoring';
+import { TherapyToolbox } from '../features/TherapyToolbox';
+import { getRecommendedTherapies } from '../../data/therapies';
 import { cn } from '../../lib/utils';
 
 // Types (duplicated locally as before, ideally centralized)
@@ -225,6 +227,11 @@ export function Result({
       {/* Interactive CBT Tools */}
       <motion.div variants={itemVariants}>
         <CbtTools />
+      </motion.div>
+
+      {/* Recommended Therapy Tools */}
+      <motion.div variants={itemVariants}>
+        <TherapyToolbox recommended={getRecommendedTherapies(phqLevel, gadLevel)} />
       </motion.div>
 
       {/* Actions */}
