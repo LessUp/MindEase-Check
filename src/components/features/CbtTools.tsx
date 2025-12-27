@@ -49,8 +49,9 @@ const BoxBreathing = () => {
         
         {/* Animated Circle */}
         <motion.div
+          key={status || 'idle'} // 当 status 改变时重新开始动画
           animate={{
-            scale: status === 'inhale' ? 1.5 : status === 'exhale' ? 1 : undefined,
+            scale: status === 'inhale' ? 1.5 : status === 'exhale' ? 1 : (status === 'hold-in' ? 1.5 : (status === 'hold-out' ? 1 : undefined)),
             borderColor: status === 'hold-in' || status === 'hold-out' ? '#0ea5e9' : '#10b981', // sky-500 vs emerald-500
           }}
           transition={{ duration: 4, ease: "linear" }}

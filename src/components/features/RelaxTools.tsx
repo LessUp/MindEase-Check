@@ -34,6 +34,7 @@ export function BreathingExercise() {
   const [isRunning, setIsRunning] = useState(false)
   const [phase, setPhase] = useState<'inhale' | 'hold1' | 'exhale' | 'hold2'>('inhale')
   const [countdown, setCountdown] = useState(0)
+  const [phaseDuration, setPhaseDuration] = useState(0) // 当前阶段的总时长
   const [cycles, setCycles] = useState(0)
   const [targetCycles, setTargetCycles] = useState(5)
 
@@ -55,12 +56,16 @@ export function BreathingExercise() {
             const phases: Array<'inhale' | 'hold1' | 'exhale' | 'hold2'> = ['inhale', 'hold1', 'exhale', 'hold2']
             const currentIdx = phases.indexOf(p)
             let nextIdx = (currentIdx + 1) % 4
-            
+
             // 跳过时长为0的阶段
             while (selectedPattern[phases[nextIdx]] === 0) {
               nextIdx = (nextIdx + 1) % 4
             }
-            
+
+            // 设置下一阶段的时长
+            const nextPhase = phases[nextIdx]
+            setPhaseDuration(selectedPattern[nextPhase])
+
             // 完成一个周期
             if (nextIdx === 0) {
               setCycles(cy => {
@@ -71,11 +76,11 @@ export function BreathingExercise() {
                 return cy + 1
               })
             }
-            
-            return phases[nextIdx]
+
+            return nextPhase
           })
-          return selectedPattern[phase === 'hold2' ? 'inhale' : 
-                 phase === 'inhale' ? 'hold1' : 
+          return selectedPattern[phase === 'hold2' ? 'inhale' :
+                 phase === 'inhale' ? 'hold1' :
                  phase === 'hold1' ? 'exhale' : 'hold2'] || 1
         }
         return c - 1
@@ -88,6 +93,7 @@ export function BreathingExercise() {
   const start = () => {
     setPhase('inhale')
     setCountdown(selectedPattern.inhale)
+    setPhaseDuration(selectedPattern.inhale)
     setCycles(0)
     setIsRunning(true)
   }
@@ -125,8 +131,9 @@ export function BreathingExercise() {
       {/* 呼吸动画 */}
       <div className="flex flex-col items-center py-8">
         <motion.div
+          key={phase} // 当 phase 改变时重新开始动画
           animate={{ scale: isRunning ? circleScale : 1 }}
-          transition={{ duration: countdown, ease: "easeInOut" }}
+          transition={{ duration: phaseDuration, ease: "easeInOut" }}
           className={cn(
             "w-40 h-40 rounded-full flex items-center justify-center",
             `bg-gradient-to-br from-${selectedPattern.color}-200 to-${selectedPattern.color}-400`
